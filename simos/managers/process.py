@@ -26,13 +26,34 @@ class State(Enum):
     NEW = 0
     READY = 1
     RUNNING = 2
-    BLOCKED = 3
-    TERMINATED = 4
+    TERMINATED = 3
+    # BLOCKED = 4
 
 
 class Instruction:
     def execute(self) -> None:
         raise NotImplementedError()
+
+
+@dataclass
+class CreateFileInstruction(Instruction):
+    pid: int
+    filename: str
+    blocks: int
+
+    def execute(self) -> None:
+        print(
+            f"Processo {self.pid}: criando arquivo '{self.filename}' com {self.blocks} blocos"
+        )
+
+
+@dataclass
+class DeleteFileInstruction(Instruction):
+    pid: int
+    filename: str
+
+    def execute(self) -> None:
+        print(f"Processo {self.pid}: deletando arquivo '{self.filename}'")
 
 
 @dataclass
@@ -47,7 +68,7 @@ class PCB:
 
     # Endereço da memória e espaço alocado (em blocos)
     memory_offset: int
-    memory_alloc: int
+    allocated_blocks: int
 
     instructions: list[Instruction] = field(default_factory=list)
     last_instruction: int = -1
@@ -60,16 +81,12 @@ class PCB:
 
     arrive_queue_time: Optional[int] = None
 
-    # arrive_new_time: Optional[int] = None
-    # arrive_cpu_time: Optional[int] = None
-
 
 class ProcessManager:
-    def __init__(self, processes: dict[int, PCB] = {}):
-        self.process_table: dict[int, PCB] = processes
+    def __init__(self):
+        self.process_table: dict[int, PCB] = {}
 
         self.new_processes: set[int] = set()
-        # self.blocked_queue: deque[int] = deque()
 
         self.realtime_queue: deque[int] = deque()
         self.user_queue: list[deque[int]] = [deque(), deque(), deque()]
@@ -79,11 +96,8 @@ class ProcessManager:
         self.running: Optional[int] = None
         self.quantum: int = 10  # 1 ms
 
-    def add_process(self, process: PCB, time: float):
+    def add_process(self, process: PCB):
         """Insere um novo processo na tabela e na fila de \"novos\" """
-        # process.state = State.NEW
-        # process.arrive_new_time = time
-
         self.process_table[process.pid] = process
         self.new_processes.add(process.pid)
 
@@ -113,20 +127,12 @@ class ProcessManager:
                 return self.running
 
     def run(self, time: int):
-        # Verifica os processos adicionados que já estão prontos
-        # while len(self.new_queue) > 0:
-        #     pid = self.new_queue[-1]
-        #     process = self.process_table[pid]
-        #     if (time - process.arrive_new_time) >= process.init_duration:
-        #         assert pid == self.new_queue.popleft()
-        #         self.enqueue_process(pid)
-
         # Adiciona o tempo gasto pelos processos nas suas filas
         for pid in list(self.new_processes):
             process = self.process_table[pid]
             if process.spent_new_time >= process.init_duration:
                 process.state = State.READY
-                self.enqueue_process(process)
+                self.enqueue_process(process, time)
                 self.new_processes.remove(pid)
             else:
                 process.spent_new_time += 1
@@ -149,8 +155,6 @@ class ProcessManager:
         pid = self.running
         process = self.process_table[pid]
 
-        print(f"Rodando processo {pid}...")
-
         if 0 <= process.last_instruction + 1 < len(process.instructions):
             process.last_instruction += 1
             process.instructions[process.last_instruction].execute()
@@ -161,29 +165,35 @@ class ProcessManager:
         if process.consumed_cpu_time >= process.cpu_duration:
             # Sinalizamos para o escalonador que esse processo
             # terminou
+            print(f"(time={time}) Processo {pid} completou.")
             process.state = State.TERMINATED
             return ScheduleEvent()
         elif process.consumed_cpu_time % self.quantum == 0:
             # Sinalizamos para o escalonador que esse processo
             # não foi terminado mas deve ser recolocado na fila
+            print(f"(time={time}) Retirando processo {pid}...")
             process.state = State.READY
             return ScheduleEvent()
 
     def run_scheduler(self, time: int):
         """Escalonador, responsável por fazer troca de contexto."""
-        print("Rodando escalonador...")
-
+        pid = None
         if self.running is None:
-            self.next_process()
+            pid = self.next_process()
         else:
             process = self.process_table[self.running]
             if process.state == State.TERMINATED:
                 self.terminated.append(self.running)
-                self.next_process()
+                pid = self.next_process()
             elif process.state == State.READY:
                 self.enqueue_process(self.running, time)
-                self.next_process()
+                pid = self.next_process()
             else:
                 raise SimulationError(
                     "Estado inconsistente de processo para fazer troca de contexto."
                 )
+            
+        if pid is None:
+            print(f"(time={time}) Nenhum processo para escalonar.")
+        else:
+            print(f"(time={time}) Escalonando processo {pid}...")
