@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from collections import deque
 from typing import Optional
-from enum import Enum
+from enum import Enum, auto
 
 from simos.managers.resource import Resource, ResourceManager
 from simos.managers.memory import MemoryManager
@@ -11,16 +11,17 @@ from simos.types import Instruction, ScheduleEvent, SystemError, SimulationError
 class PCBError(SystemError):
     pass
 
+
 class SchedulerError(SystemError):
     pass
 
 
 class State(Enum):
-    NEW = 0
-    READY = 1
-    RUNNING = 2
-    TERMINATED = 3
-    # BLOCKED = 4
+    NEW = auto()
+    READY = auto()
+    RUNNING = auto()
+    BLOCKED = auto()
+    TERMINATED = auto()
 
 
 @dataclass
@@ -96,25 +97,18 @@ class ProcessManager:
     def allocate_memory(self, process: PCB):
         offset = None
         if process.priority == 0:
-            offset = self.memory.allocate_real_time(process.pid, process.allocated_blocks)
+            offset = self.memory.allocate_real_time(
+                process.pid, process.allocated_blocks
+            )
         elif process.priority <= 3:
             offset = self.memory.allocate_user(process.pid, process.allocated_blocks)
         else:
             raise PCBError(f"A prioridade {process.priority} não existe.")
-        
+
         process.memory_offset = offset
 
-    def acquire_resources(self, process: PCB):
-        acquired: list[Resource] = []
-        for resource in process.use_resources:
-            success = self.resource.acquire(process.pid, resource)
-            if not success:
-                process.state = State.BLOCKED
-                for acquired_resource in acquired:
-                    self.resource.release(process.pid, acquired_resource)
-
-    def enqueue_process(self, process: PCB, time: float):
-        """Coloca um processo na fila de \"ready\" """
+    def enqueue_process(self, process: PCB, time: int):
+        # Coloca um processo na fila de "ready"
         if process.priority == 0:
             process.arrive_queue_time = time
             self.realtime_queue.append(process.pid)
@@ -137,17 +131,31 @@ class ProcessManager:
                 pid = queue.popleft()
                 self.running = pid
                 return self.running
+            
+    def admit_process(self, process: PCB, time: int):
+        self.new_processes.remove(process.pid)
+        self.allocate_memory(process)
+
+        if not self.resource.acquire(process.pid, process.use_resources):
+            process.state = State.BLOCKED
+            self.blocked_processes.add(process.pid)
+            return
+
+        self.enqueue_process(process, time)
+        process.state = State.READY
+
+    
+    def unblock_process(self, process: PCB, time: int):
+        self.blocked_processes.remove(process.pid)
+        self.enqueue_process(process, time)
+        process.state = State.READY
 
     def run(self, time: int):
         # Adiciona o tempo gasto pelos processos nas suas filas
         for pid in list(self.new_processes):
             process = self.process_table[pid]
             if process.spent_new_time >= process.init_duration:
-                self.allocate_memory(process)
-                self.enqueue_process(process, time)
-                self.new_processes.remove(pid)
-
-                process.state = State.READY
+                self.admit_process(process, time)
             else:
                 process.spent_new_time += 1
 
@@ -198,7 +206,13 @@ class ProcessManager:
             process = self.process_table[self.running]
             if process.state == State.TERMINATED:
                 self.terminated.append(self.running)
+
                 self.memory.free(process.memory_offset, process.allocated_blocks)
+                unblocked_pids = self.resource.release(process.use_resources)
+                for unblocked_pid in unblocked_pids:
+                    unblocked_process = self.process_table[unblocked_pid]
+                    self.unblock_process(unblocked_process, time)
+
                 pid = self.next_process()
             elif process.state == State.READY:
                 self.enqueue_process(self.running, time)
