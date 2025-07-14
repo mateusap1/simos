@@ -7,9 +7,9 @@ from simos.managers.process import (
     DeleteFileInstruction,
     ProcessManager,
     MemoryManager,
-    ResourceManager
+    ResourceManager,
 )
-from simos.managers.resource import Printer, Scanner, Sata, Modem, Resource 
+from simos.managers.resource import Printer, Scanner, Sata, Modem, Resource
 
 
 def main():
@@ -20,6 +20,7 @@ def main():
 
     # Lê processos
     processes: dict[int, PCB] = {}
+    resources: set[Resource] = set()
     with open(args.process_file) as f:
         for line in f:
             line = line.strip()
@@ -36,17 +37,33 @@ def main():
                 memory_offset=0,
                 allocated_blocks=int(blocks),
             )
-            if prn == "1":
+
+            # Não ficou claro na especificação
+
+            # Assumimos que 0 é um código "morto" e implica a não
+            # utilização da impressora ou do Sata, isso é inferido
+            # pelos exemplos aprensentados
+
+            # Caso contrário, o código será aquilo que estiver nessa
+            # coluna
+            if prn != "0":
                 pcb.use_resources.append(Printer(prn))
             if scn == "1":
                 pcb.use_resources.append(Scanner())
             if modem == "1":
-                pcb.use_resources.append(Resource.MODEM)
-            if disk == "1":
-                pcb.use_resources.append(Resource.SATA)
-            processes[pid] = pcb
+                pcb.use_resources.append(Modem())
+            if disk != "0":
+                pcb.use_resources.append(Sata(disk))
 
             print(pcb)
+
+            if len(pcb.use_resources) > 0:
+                resources.add(pcb.use_resources[0])
+
+            if len(pcb.use_resources) > 1:
+                raise ValueError("Cada processo deve utilizar um recurso somente.")
+
+            processes[pid] = pcb
 
     # Lê operações de arquivos
     with open(args.ops_file) as f:
@@ -71,7 +88,7 @@ def main():
                 print(f"Processo {pid} não existe")
 
     mm = MemoryManager()
-    rm = ResourceManager([])
+    rm = ResourceManager(resources)
     pm = ProcessManager(mm, rm)
     for pcb in processes.values():
         pm.add_process(pcb)

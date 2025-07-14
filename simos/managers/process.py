@@ -136,13 +136,14 @@ class ProcessManager:
         self.new_processes.remove(process.pid)
         self.allocate_memory(process)
 
-        if not self.resource.acquire(process.pid, process.use_resources):
-            print(
-                f"(time={time}) Bloqueando processo {process.pid}, sem recursos disponíveis."
-            )
-            process.state = State.BLOCKED
-            self.blocked_processes.add(process.pid)
-            return
+        if len(process.use_resources) > 0:
+            if not self.resource.acquire(process.pid, process.use_resources[0]):
+                print(
+                    f"(time={time}) Bloqueando processo {process.pid}, sem recursos disponíveis."
+                )
+                process.state = State.BLOCKED
+                self.blocked_processes.add(process.pid)
+                return
 
         print(f"(time={time}) Processo {process.pid} pronto.")
 
@@ -214,10 +215,11 @@ class ProcessManager:
                 self.terminated.append(self.running)
 
                 self.memory.free(process.memory_offset, process.allocated_blocks)
-                unblocked_pids = self.resource.release(process.use_resources)
-                for unblocked_pid in unblocked_pids:
-                    unblocked_process = self.process_table[unblocked_pid]
-                    self.unblock_process(unblocked_process, time)
+                if len(process.use_resources) > 0:
+                    unblocked_pid = self.resource.release(process.use_resources[0])
+                    if unblocked_pid is not None:
+                        unblocked_process = self.process_table[unblocked_pid]
+                        self.unblock_process(unblocked_process, time)
 
                 pid = self.next_process()
             elif process.state == State.READY:
