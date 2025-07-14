@@ -6,6 +6,7 @@ from simos.managers.process import (
     CreateFileInstruction,
     DeleteFileInstruction,
     ProcessManager,
+    MemoryManager
 )
 from simos.resources import Resource
 
@@ -66,7 +67,8 @@ def main():
             else:
                 print(f"Processo {pid} não existe")
 
-    pm = ProcessManager()
+    mm = MemoryManager()
+    pm = ProcessManager(mm)
     for pcb in processes.values():
         pm.add_process(pcb)
 

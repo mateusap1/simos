@@ -4,8 +4,12 @@ from typing import Optional
 from enum import Enum
 
 from simos.resources import Resource
+from simos.managers.memory import MemoryManager
 from simos.types import Instruction, ScheduleEvent, SystemError, SimulationError
 
+
+class PCBError(SystemError):
+    pass
 
 class SchedulerError(SystemError):
     pass
@@ -67,7 +71,8 @@ class PCB:
 
 
 class ProcessManager:
-    def __init__(self):
+    def __init__(self, memory: MemoryManager):
+        self.memory = memory
         self.process_table: dict[int, PCB] = {}
 
         self.new_processes: set[int] = set()
@@ -88,10 +93,16 @@ class ProcessManager:
     def enqueue_process(self, process: PCB, time: float):
         """Coloca um processo na fila de \"ready\" """
         if process.priority == 0:
+            offset = self.memory.allocate_real_time(process.pid, process.allocated_blocks)
+            process.memory_offset = offset
             process.arrive_queue_time = time
+            
             self.realtime_queue.append(process.pid)
         elif process.priority <= 3:
+            offset = self.memory.allocate_user(process.pid, process.allocated_blocks)
+            process.memory_offset = offset
             process.arrive_queue_time = time
+
             self.user_queue[process.priority - 1].append(process.pid)
         else:
             raise SchedulerError(f"A prioridade {process.priority} não existe.")
@@ -168,6 +179,7 @@ class ProcessManager:
             process = self.process_table[self.running]
             if process.state == State.TERMINATED:
                 self.terminated.append(self.running)
+                self.memory.free(process.memory_offset, process.allocated_blocks)
                 pid = self.next_process()
             elif process.state == State.READY:
                 self.enqueue_process(self.running, time)

@@ -30,9 +30,13 @@ class MemoryManager:
         for i in range(offset, offset+space):
             self.memory[i] = label
 
-    def deallocate(self, offset: int, space: int):
+        print(f"Processo {label} alocou {space} blocos com sucesso em {offset}.")
+
+    def free(self, offset: int, space: int):
         for i in range(offset, offset+space):
             self.memory[i] = None
+
+        print(f"{space} blocos liberados com sucesso em {offset}.")
 
     def find_fit(self, size: int, start: int, end: int):
         count = 0
