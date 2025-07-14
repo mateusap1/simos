@@ -3,7 +3,7 @@ from collections import deque
 from typing import Optional
 from enum import Enum
 
-from simos.resources import Resource
+from simos.managers.resource import Resource, ResourceManager
 from simos.managers.memory import MemoryManager
 from simos.types import Instruction, ScheduleEvent, SystemError, SimulationError
 
@@ -71,11 +71,14 @@ class PCB:
 
 
 class ProcessManager:
-    def __init__(self, memory: MemoryManager):
+    def __init__(self, memory: MemoryManager, resource: ResourceManager):
         self.memory = memory
+        self.resource = resource
+
         self.process_table: dict[int, PCB] = {}
 
         self.new_processes: set[int] = set()
+        self.blocked_processes: set[int] = set()
 
         self.realtime_queue: deque[int] = deque()
         self.user_queue: list[deque[int]] = [deque(), deque(), deque()]
@@ -100,6 +103,15 @@ class ProcessManager:
             raise PCBError(f"A prioridade {process.priority} não existe.")
         
         process.memory_offset = offset
+
+    def acquire_resources(self, process: PCB):
+        acquired: list[Resource] = []
+        for resource in process.use_resources:
+            success = self.resource.acquire(process.pid, resource)
+            if not success:
+                process.state = State.BLOCKED
+                for acquired_resource in acquired:
+                    self.resource.release(process.pid, acquired_resource)
 
     def enqueue_process(self, process: PCB, time: float):
         """Coloca um processo na fila de \"ready\" """
@@ -131,10 +143,11 @@ class ProcessManager:
         for pid in list(self.new_processes):
             process = self.process_table[pid]
             if process.spent_new_time >= process.init_duration:
-                process.state = State.READY
                 self.allocate_memory(process)
                 self.enqueue_process(process, time)
                 self.new_processes.remove(pid)
+
+                process.state = State.READY
             else:
                 process.spent_new_time += 1
 
