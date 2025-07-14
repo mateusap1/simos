@@ -233,4 +233,5 @@ class ProcessManager:
         if pid is None:
             print(f"(time={time}) Nenhum processo para escalonar.")
         else:
+            self.process_table[pid].state = State.RUNNING
             print(f"(time={time}) Escalonando processo {pid}...")
