@@ -3,11 +3,41 @@ from enum import Enum, auto
 from typing import List
 
 
-class Resource(Enum):
-    PRINTER = auto()
-    SCANNER = auto()
-    MODEM = auto()
-    SATA = auto()
+class Resource:
+    def __init__(self):
+        pass
+
+
+class Printer(Resource):
+    def __init__(self, code: int):
+        self.code = code
+
+    def __eq__(self, other: "Resource"):
+        if isinstance(other, Printer):
+            return other.code == self.code
+
+        return False
+
+
+class Sata(Resource):
+    def __init__(self, code: int):
+        self.code = code
+
+    def __eq__(self, other: "Resource"):
+        if isinstance(other, Sata):
+            return other.code == self.code
+
+        return False
+
+
+class Scanner(Resource):
+    def __init__(self):
+        pass
+
+
+class Modem(Resource):
+    def __init__(self):
+        pass
 
 
 class ResourceManager:
@@ -33,9 +63,16 @@ class ResourceManager:
                 remaining_resources.add(r)
 
         self.waiting_processes[pid] = remaining_resources
+        if len(remaining_resources) == 0:
+            print(f"{len(resources)} recursos obtidos com sucesso.")
+        else:
+            print(f"{len(resources)} recursos obtidos, esperando liberação dos demais.")
+
         return len(remaining_resources) == 0
 
     def release(self, resources: List[Resource]) -> List[int]:
+        print(f"Liberando {len(resources)} recursos...")
+
         awakened: List[int] = []
         for r in resources:
             self.available_resources[r] = self.available_resources.get(r, 0) + 1

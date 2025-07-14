@@ -131,21 +131,27 @@ class ProcessManager:
                 pid = queue.popleft()
                 self.running = pid
                 return self.running
-            
+
     def admit_process(self, process: PCB, time: int):
         self.new_processes.remove(process.pid)
         self.allocate_memory(process)
 
         if not self.resource.acquire(process.pid, process.use_resources):
+            print(
+                f"(time={time}) Bloqueando processo {process.pid}, sem recursos disponíveis."
+            )
             process.state = State.BLOCKED
             self.blocked_processes.add(process.pid)
             return
 
+        print(f"(time={time}) Processo {process.pid} pronto.")
+
         self.enqueue_process(process, time)
         process.state = State.READY
 
-    
     def unblock_process(self, process: PCB, time: int):
+        print(f"(time={time}) Desbloqueando processo {process.pid}.")
+
         self.blocked_processes.remove(process.pid)
         self.enqueue_process(process, time)
         process.state = State.READY

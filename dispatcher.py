@@ -6,9 +6,10 @@ from simos.managers.process import (
     CreateFileInstruction,
     DeleteFileInstruction,
     ProcessManager,
-    MemoryManager
+    MemoryManager,
+    ResourceManager
 )
-from simos.resources import Resource
+from simos.managers.resource import Printer, Scanner, Sata, Modem, Resource 
 
 
 def main():
@@ -36,14 +37,16 @@ def main():
                 allocated_blocks=int(blocks),
             )
             if prn == "1":
-                pcb.use_resources.append(Resource.PRINTER)
+                pcb.use_resources.append(Printer(prn))
             if scn == "1":
-                pcb.use_resources.append(Resource.SCANNER)
+                pcb.use_resources.append(Scanner())
             if modem == "1":
                 pcb.use_resources.append(Resource.MODEM)
             if disk == "1":
-                pcb.use_resources.append(Resource.DISK)
+                pcb.use_resources.append(Resource.SATA)
             processes[pid] = pcb
+
+            print(pcb)
 
     # Lê operações de arquivos
     with open(args.ops_file) as f:
@@ -68,7 +71,8 @@ def main():
                 print(f"Processo {pid} não existe")
 
     mm = MemoryManager()
-    pm = ProcessManager(mm)
+    rm = ResourceManager([])
+    pm = ProcessManager(mm, rm)
     for pcb in processes.values():
         pm.add_process(pcb)
 
