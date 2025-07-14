@@ -4,21 +4,10 @@ from typing import Optional
 from enum import Enum
 
 from simos.resources import Resource
+from simos.types import Instruction, ScheduleEvent, SystemError, SimulationError
 
 
-class SchedulerError(Exception):
-    pass
-
-
-class SimulationError(Exception):
-    pass
-
-
-class SystemEvent:
-    pass
-
-
-class ScheduleEvent(SystemEvent):
+class SchedulerError(SystemError):
     pass
 
 
@@ -28,11 +17,6 @@ class State(Enum):
     RUNNING = 2
     TERMINATED = 3
     # BLOCKED = 4
-
-
-class Instruction:
-    def execute(self) -> None:
-        raise NotImplementedError()
 
 
 @dataclass
@@ -192,7 +176,7 @@ class ProcessManager:
                 raise SimulationError(
                     "Estado inconsistente de processo para fazer troca de contexto."
                 )
-            
+
         if pid is None:
             print(f"(time={time}) Nenhum processo para escalonar.")
         else:
