@@ -26,29 +26,17 @@ class ResourceManager:
             r: deque() for r in self.available_resources
         }
 
-    def acquire_resources(self, pid: int, rtypes: list[Resource]) -> bool:
-        # Verifica disponibilidade de todos os recursos
-        for r in rtypes:
-            if self.available_resources[r] <= 0:
-                return False
+    def acquire(self, pid: int, rtype: Resource) -> bool:
+        # Tenta reservar um recurso para pid.
+        # Retorna True se conseguiu, False se ficou bloqueado.
 
-        # Se passou, consome todos
-        for r in rtypes:
-            self.available_resources[r] -= 1
-    
-        return True
-
-    # def acquire(self, pid: int, rtype: Resource) -> bool:
-    #     # Tenta reservar um recurso para pid.
-    #     # Retorna True se conseguiu, False se ficou bloqueado.
-
-    #     if self.available_resources[rtype] > 0:
-    #         self.available_resources[rtype] -= 1
-    #         return True
+        if self.available_resources[rtype] > 0:
+            self.available_resources[rtype] -= 1
+            return True
         
-    #     # Sem unidades livres: bloqueia o processo
-    #     self.wait_queues[rtype].append(pid)
-    #     return False
+        # Sem unidades livres: bloqueia o processo
+        self.wait_queues[rtype].append(pid)
+        return False
 
     def release(self, pid: int, rtype: Resource) -> Optional[int]:
         # Libera o recurso e passa para o próximo na fila se houver
