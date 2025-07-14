@@ -90,19 +90,24 @@ class ProcessManager:
         self.process_table[process.pid] = process
         self.new_processes.add(process.pid)
 
+    def allocate_memory(self, process: PCB):
+        offset = None
+        if process.priority == 0:
+            offset = self.memory.allocate_real_time(process.pid, process.allocated_blocks)
+        elif process.priority <= 3:
+            offset = self.memory.allocate_user(process.pid, process.allocated_blocks)
+        else:
+            raise PCBError(f"A prioridade {process.priority} não existe.")
+        
+        process.memory_offset = offset
+
     def enqueue_process(self, process: PCB, time: float):
         """Coloca um processo na fila de \"ready\" """
         if process.priority == 0:
-            offset = self.memory.allocate_real_time(process.pid, process.allocated_blocks)
-            process.memory_offset = offset
             process.arrive_queue_time = time
-            
             self.realtime_queue.append(process.pid)
         elif process.priority <= 3:
-            offset = self.memory.allocate_user(process.pid, process.allocated_blocks)
-            process.memory_offset = offset
             process.arrive_queue_time = time
-
             self.user_queue[process.priority - 1].append(process.pid)
         else:
             raise SchedulerError(f"A prioridade {process.priority} não existe.")
@@ -127,6 +132,7 @@ class ProcessManager:
             process = self.process_table[pid]
             if process.spent_new_time >= process.init_duration:
                 process.state = State.READY
+                self.allocate_memory(process)
                 self.enqueue_process(process, time)
                 self.new_processes.remove(pid)
             else:
