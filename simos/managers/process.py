@@ -79,7 +79,7 @@ class PCB:
     use_resources: list[Resource] = field(default_factory=list)
     state: State = State.NEW
 
-    spent_new_time: int = 0
+    spent_waiting_time: int = 0
     consumed_cpu_time: int = 0
 
     arrive_queue_time: Optional[int] = None
@@ -100,6 +100,9 @@ class ProcessManager:
 
         self.realtime_queue: deque[int] = deque()
         self.user_queue: list[deque[int]] = [deque(), deque(), deque()]
+
+        # Ignora-se a primeira fila já que é a mais prioritária
+        self.aging_thresholds: list[int] = [3, 5]
 
         self.terminated: list[int] = []
 
@@ -141,20 +144,23 @@ class ProcessManager:
         if len(self.realtime_queue) > 0:
             pid = self.realtime_queue.popleft()
             self.running = pid
-
-        for queue in self.user_queue:
-            if len(queue) > 0:
-                pid = queue.popleft()
-                self.running = pid
+        else:
+            for queue in self.user_queue:
+                if len(queue) > 0:
+                    pid = queue.popleft()
+                    self.running = pid
+                    break
 
         if self.running is not None:
             process = self.process_table[pid]
+            process.spent_waiting_time = 0
             process.state = State.RUNNING
 
         return self.running
 
     def admit_process(self, process: PCB, time: int):
         self.new_processes.remove(process.pid)
+        process.spent_waiting_time = 0
 
         try:
             self.allocate_memory(process)
@@ -191,19 +197,39 @@ class ProcessManager:
         # quando chega um novo processo.
         for pid in list(self.new_processes):
             process = self.process_table[pid]
-            if process.spent_new_time >= process.init_duration:
+            if process.spent_waiting_time >= process.init_duration:
                 self.admit_process(process, time)
             else:
-                process.spent_new_time += 1
+                process.spent_waiting_time += 1
 
-        # Aging: TODO
+        # Incrementar tempo gasto de espera para processos nas filas
+        # READY de usuário (AGING)
+        # Ignora-se a fila mais prioritária
+        for level in range(1, len(self.user_queue)):
+            queue = self.user_queue[level]
+            threshold = self.aging_thresholds[level - 1] * self.quantum
+            to_promote: list[int] = []
+
+            for pid in queue:
+                process = self.process_table[pid]
+                process.spent_waiting_time += 1
+                if process.spent_waiting_time >= threshold:
+                    to_promote.append(pid)
+
+            for pid in to_promote:
+                print(f"(time={time}) Promovendo processo {pid} para prioridade {level}.")
+                process.priority -= 1
+                queue.remove(pid)
+                self.user_queue[level - 1].append(pid)
+                self.process_table[pid].spent_waiting_time = 0
 
         # Roda o processo e verifica se ele disparou algum evento
         event = self.run_process(time)
         if event is None:
             return
+
         elif isinstance(event, ScheduleEvent):
-            self.run_scheduler(time)
+            self.run_dispatcher(time)
         else:
             raise ValueError("Evento de sistema não existe.")
 
@@ -230,15 +256,32 @@ class ProcessManager:
             print(f"(time={time}) Processo {pid} completou.")
             process.state = State.TERMINATED
             return ScheduleEvent()
-        elif process.priority > 0 and process.consumed_cpu_time % self.quantum == 0:
-            # Sinalizamos para o escalonador que esse processo
-            # não foi terminado mas deve ser recolocado na fila
-            print(f"(time={time}) Retirando processo {pid}...")
-            process.state = State.READY
-            return ScheduleEvent()
 
-    def run_scheduler(self, time: int):
-        """Escalonador, responsável por fazer troca de contexto."""
+        elif process.priority > 0:
+            # Verifica preempção
+
+            # Se chegou um processo de prioridade maior, deve escalonar
+            # Simula interrupção de sistema
+            greater_priority_arrived = len(self.realtime_queue) > 0
+            for queue in self.user_queue[: process.priority - 1]:
+                if greater_priority_arrived:
+                    break
+
+                if len(queue) > 0:
+                    greater_priority_arrived = True
+
+            # Se existe algum processo na mesma fila de espera desse
+            # processo. Se não existir, não tem porque chamar o dispatcher
+            any_process_in_queue = len(self.user_queue[process.priority - 1]) > 0
+
+            if greater_priority_arrived or (time % self.quantum == 0 and any_process_in_queue):
+                # Sinalizamos para o dispatcher que esse processo
+                # não foi terminado mas deve ser recolocado na fila
+                print(f"(time={time}) Retirando processo {pid}...")
+                process.state = State.READY
+                return ScheduleEvent()
+
+    def run_dispatcher(self, time: int):
         pid = None
         if self.running is None:
             pid = self.next_process()

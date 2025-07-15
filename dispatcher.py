@@ -99,7 +99,7 @@ def main():
         pm.add_process(pcb)
 
     clock = 1
-    while len(pm.terminated) < len(processes):
+    while len(pm.terminated) < len(processes) and clock < 100:
         pm.run(clock)
         clock += 1
     
