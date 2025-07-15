@@ -5,6 +5,7 @@ from enum import Enum, auto
 
 from simos.managers.resource import Resource, ResourceManager
 from simos.managers.memory import MemoryManager
+from simos.managers.storage import FileManager
 from simos.types import Instruction, ScheduleEvent, SystemError, SimulationError
 
 
@@ -26,23 +27,29 @@ class State(Enum):
 
 @dataclass
 class CreateFileInstruction(Instruction):
-    pid: int
     filename: str
     blocks: int
 
-    def execute(self) -> None:
-        print(
-            f"Processo {self.pid}: criando arquivo '{self.filename}' com {self.blocks} blocos"
-        )
+    def execute(self, process: "PCB", storage: FileManager) -> None:
+        try:
+            address = storage.create_file(process.pid, self.filename, self.blocks)
+            print(
+                f"Processo {process.pid} criou arquivo '{self.filename}' no endereço {address}."
+            )
+        except SystemError as e:
+            print(e)
 
 
 @dataclass
 class DeleteFileInstruction(Instruction):
-    pid: int
     filename: str
 
-    def execute(self) -> None:
-        print(f"Processo {self.pid}: deletando arquivo '{self.filename}'")
+    def execute(self, process: "PCB", storage: FileManager) -> None:
+        try:
+            storage.delete_file(process.pid, self.filename, process.priority == 0)
+            print(f"Processo {process.pid} deletou o arquivo '{self.filename}'.")
+        except SystemError as e:
+            print(e)
 
 
 @dataclass
@@ -72,9 +79,12 @@ class PCB:
 
 
 class ProcessManager:
-    def __init__(self, memory: MemoryManager, resource: ResourceManager):
+    def __init__(
+        self, memory: MemoryManager, resource: ResourceManager, storage: FileManager
+    ):
         self.memory = memory
         self.resource = resource
+        self.storage = storage
 
         self.process_table: dict[int, PCB] = {}
 
@@ -186,7 +196,9 @@ class ProcessManager:
 
         if 0 <= process.last_instruction + 1 < len(process.instructions):
             process.last_instruction += 1
-            process.instructions[process.last_instruction].execute()
+            process.instructions[process.last_instruction].execute(
+                process, self.storage
+            )
 
         # A cada tick consome um de tempo (para efeitos de simulação)
         process.consumed_cpu_time += 1

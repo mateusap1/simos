@@ -10,6 +10,7 @@ from simos.managers.process import (
     ResourceManager,
 )
 from simos.managers.resource import Printer, Scanner, Sata, Modem, Resource
+from simos.managers.storage import FileManager
 
 
 def main():
@@ -55,8 +56,6 @@ def main():
             if disk != "0":
                 pcb.use_resources.append(Sata(disk))
 
-            print(pcb)
-
             if len(pcb.use_resources) > 0:
                 resources.add(pcb.use_resources[0])
 
@@ -69,8 +68,13 @@ def main():
     with open(args.ops_file) as f:
         total_blocks = int(f.readline().strip())
         n_segments = int(f.readline().strip())
+
+        initial_files: list[tuple[str, int, int]] = []
         for _ in range(n_segments):
-            f.readline()
+            line = f.readline().strip()
+            filename, address, size = [p.strip() for p in line.split(",")]
+            initial_files.append((filename, int(address), int(size)))
+
         for line in f:
             line = line.strip()
             if not line:
@@ -79,9 +83,9 @@ def main():
             pid = int(pid_str)
             if op_code == "0":
                 blocks_n = int(rest[0])
-                instr = CreateFileInstruction(pid, filename, blocks_n)
+                instr = CreateFileInstruction(filename, blocks_n)
             else:
-                instr = DeleteFileInstruction(pid, filename)
+                instr = DeleteFileInstruction(filename)
             if pid in processes:
                 processes[pid].instructions.append(instr)
             else:
@@ -89,7 +93,8 @@ def main():
 
     mm = MemoryManager()
     rm = ResourceManager(resources)
-    pm = ProcessManager(mm, rm)
+    sm = FileManager(total_blocks, initial_files)
+    pm = ProcessManager(mm, rm, sm)
     for pcb in processes.values():
         pm.add_process(pcb)
 
