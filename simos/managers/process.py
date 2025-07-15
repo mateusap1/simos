@@ -52,7 +52,6 @@ class DeleteFileInstruction(Instruction):
             print(f"Não pode deletar arquivo {self.filename}: {e}")
 
 
-
 @dataclass
 class PCB:
     pid: int
@@ -98,7 +97,7 @@ class ProcessManager:
         self.terminated: list[int] = []
 
         self.running: Optional[int] = None
-        self.quantum: int = 10  # 1 ms
+        self.quantum: int = 1  # 1 ms
 
     def add_process(self, process: PCB):
         """Insere um novo processo na tabela e na fila de \"novos\" """
@@ -135,17 +134,28 @@ class ProcessManager:
         if len(self.realtime_queue) > 0:
             pid = self.realtime_queue.popleft()
             self.running = pid
-            return self.running
 
         for queue in self.user_queue:
             if len(queue) > 0:
                 pid = queue.popleft()
                 self.running = pid
-                return self.running
+
+        if self.running is not None:
+            process = self.process_table[pid]
+            process.state = State.RUNNING
+
+        return self.running
 
     def admit_process(self, process: PCB, time: int):
         self.new_processes.remove(process.pid)
-        self.allocate_memory(process)
+
+        try:
+            self.allocate_memory(process)
+        except SystemError as e:
+            print(f"(time={time}) Processo {process.pid} não pode ser adimitido: {e}")
+            process.state = State.TERMINATED
+            self.terminated.append(process.pid)
+            return
 
         if len(process.use_resources) > 0:
             if not self.resource.acquire(process.pid, process.use_resources[0]):
@@ -170,6 +180,8 @@ class ProcessManager:
 
     def run(self, time: int):
         # Adiciona o tempo gasto pelos processos nas suas filas
+        # Isso simula a interrupção de hardware que acontece
+        # quando chega um novo processo.
         for pid in list(self.new_processes):
             process = self.process_table[pid]
             if process.spent_new_time >= process.init_duration:
@@ -237,7 +249,7 @@ class ProcessManager:
 
                 pid = self.next_process()
             elif process.state == State.READY:
-                self.enqueue_process(self.running, time)
+                self.enqueue_process(process, time)
                 pid = self.next_process()
             else:
                 raise SimulationError(
@@ -247,5 +259,5 @@ class ProcessManager:
         if pid is None:
             print(f"(time={time}) Nenhum processo para escalonar.")
         else:
-            self.process_table[pid].state = State.RUNNING
+            # self.process_table[pid].state = State.RUNNING
             print(f"(time={time}) Escalonando processo {pid}...")

@@ -102,6 +102,8 @@ def main():
     while len(pm.terminated) < len(processes):
         pm.run(clock)
         clock += 1
+    
+    print(f"Mapa do disco: {sm.blocks}")
 
 
 if __name__ == "__main__":
