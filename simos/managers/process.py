@@ -103,7 +103,6 @@ class ProcessManager:
 
         self.terminated: list[int] = []
 
-        # self.last_running: Optional[int] = None
         self.running: Optional[int] = None
         self.quantum: int = 1  # 1 ms
 
@@ -232,8 +231,6 @@ class ProcessManager:
             process.state = State.TERMINATED
             return ScheduleEvent()
         elif process.priority > 0 and process.consumed_cpu_time % self.quantum == 0:
-            # Troca de contexto para o escalonador
-
             # Sinalizamos para o escalonador que esse processo
             # não foi terminado mas deve ser recolocado na fila
             print(f"(time={time}) Retirando processo {pid}...")
