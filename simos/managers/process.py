@@ -3,7 +3,14 @@ from collections import deque
 from typing import Optional
 from enum import Enum, auto
 
-from simos.managers.resource import Resource, ResourceManager
+from simos.managers.resource import (
+    Resource,
+    ResourceManager,
+    Printer,
+    Sata,
+    Scanner,
+    Modem,
+)
 from simos.managers.memory import MemoryManager
 from simos.managers.storage import FileManager
 from simos.types import Instruction, ScheduleEvent, SystemError, SimulationError
@@ -96,6 +103,7 @@ class ProcessManager:
 
         self.terminated: list[int] = []
 
+        # self.last_running: Optional[int] = None
         self.running: Optional[int] = None
         self.quantum: int = 1  # 1 ms
 
@@ -259,5 +267,23 @@ class ProcessManager:
         if pid is None:
             print(f"(time={time}) Nenhum processo para escalonar.")
         else:
+            process = self.process_table[pid]
+
+            printers = process.use_resources.count(lambda r: isinstance(r, Printer))
+            scanners = process.use_resources.count(lambda r: isinstance(r, Scanner))
+            modems = process.use_resources.count(lambda r: isinstance(r, Modem))
+            satas = process.use_resources.count(lambda r: isinstance(r, Sata))
+
+            print("dispatcher => ")
+            print(f"    PID: {process.pid}")
+            print(f"    offset: {process.memory_offset}")
+            print(f"    blocks: {process.allocated_blocks}")
+            print(f"    priority: {process.priority}")
+            print(f"    time: {time}")
+            print(f"    printers: {printers}")
+            print(f"    scanners: {scanners}")
+            print(f"    modems: {modems}")
+            print(f"    satas: {satas}")
+
             # self.process_table[pid].state = State.RUNNING
-            print(f"(time={time}) Escalonando processo {pid}...")
+            # print(f"(time={time}) Escalonando processo {pid}...")
