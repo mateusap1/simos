@@ -37,7 +37,7 @@ class CreateFileInstruction(Instruction):
                 f"Processo {process.pid} criou arquivo '{self.filename}' no endereço {address}."
             )
         except SystemError as e:
-            print(e)
+            print(f"Não pode criar arquivo {self.filename}: {e}")
 
 
 @dataclass
@@ -49,7 +49,8 @@ class DeleteFileInstruction(Instruction):
             storage.delete_file(process.pid, self.filename, process.priority == 0)
             print(f"Processo {process.pid} deletou o arquivo '{self.filename}'.")
         except SystemError as e:
-            print(e)
+            print(f"Não pode deletar arquivo {self.filename}: {e}")
+
 
 
 @dataclass
@@ -196,6 +197,7 @@ class ProcessManager:
 
         if 0 <= process.last_instruction + 1 < len(process.instructions):
             process.last_instruction += 1
+            print(f"Instrução {process.last_instruction}: ", end="")
             process.instructions[process.last_instruction].execute(
                 process, self.storage
             )

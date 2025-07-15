@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from simos.types import SystemError
 
 
 class OutOfStorageError(SystemError):
@@ -57,7 +58,6 @@ class FileManager:
         # can be anything
         file = self.metadata.get(name)
         if file is None:
-            print(self.metadata)
             raise FileNotExistError(f"Arquivo {name} não existe.")
 
         if not is_real_time and file.owner != pid:
