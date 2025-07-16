@@ -1,4 +1,5 @@
 import argparse
+import time
 
 
 from simos.managers.process import (
@@ -11,6 +12,7 @@ from simos.managers.process import (
 )
 from simos.managers.resource import Printer, Scanner, Sata, Modem, Resource
 from simos.managers.storage import FileManager
+
 
 
 def main():
@@ -102,6 +104,7 @@ def main():
     while len(pm.terminated) < len(processes) and clock < 100:
         pm.run(clock)
         clock += 1
+        time.sleep(1)
     
     print(f"Mapa do disco: {sm.blocks}")
 

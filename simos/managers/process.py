@@ -242,7 +242,7 @@ class ProcessManager:
 
         if 0 <= process.last_instruction + 1 < len(process.instructions):
             process.last_instruction += 1
-            print(f"Instrução {process.last_instruction}: ", end="")
+            print(f"Instrução {process.last_instruction+1}: ", end="")
             process.instructions[process.last_instruction].execute(
                 process, self.storage
             )
@@ -307,7 +307,8 @@ class ProcessManager:
                 )
 
         if pid is None:
-            print(f"(time={time}) Nenhum processo para escalonar.")
+            pass
+            # print(f"(time={time}) Nenhum processo para escalonar.")
         else:
             process = self.process_table[pid]
 
