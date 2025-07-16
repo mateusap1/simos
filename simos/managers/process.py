@@ -11,7 +11,7 @@ from simos.managers.resource import (
     Scanner,
     Modem,
 )
-from simos.managers.memory import MemoryManager
+from simos.managers.memory import MemoryManager, OutOfMemoryError
 from simos.managers.storage import FileManager
 from simos.types import Instruction, ScheduleEvent, SystemError, SimulationError
 
@@ -164,10 +164,12 @@ class ProcessManager:
 
         try:
             self.allocate_memory(process)
-        except SystemError as e:
-            print(f"(time={time}) Processo {process.pid} não pode ser adimitido: {e}")
-            process.state = State.TERMINATED
-            self.terminated.append(process.pid)
+        except OutOfMemoryError:
+            print(
+                f"(time={time}) Bloqueando processo {process.pid}, sem memória disponível."
+            )
+            process.state = State.BLOCKED
+            self.blocked_processes.add(process.pid)
             return
 
         if len(process.use_resources) > 0:
