@@ -290,7 +290,15 @@ class ProcessManager:
             if process.state == State.TERMINATED:
                 self.terminated.append(self.running)
 
-                self.memory.free(process.memory_offset, process.allocated_blocks)
+                unblocked_pids = self.memory.free(process.memory_offset, process.allocated_blocks)
+                for unblocked_pid in unblocked_pids:
+                    unblocked_process = self.process_table[unblocked_pid]
+                    if len(process.use_resources) > 0:
+                        if not self.resource.acquire(process.pid, process.use_resources[0]):
+                            break
+
+                    self.unblock_process(unblocked_process, time)
+
                 if len(process.use_resources) > 0:
                     unblocked_pid = self.resource.release(process.use_resources[0])
                     if unblocked_pid is not None:
