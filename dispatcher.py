@@ -104,7 +104,7 @@ def main():
     while len(pm.terminated) < len(processes) and clock < 100:
         pm.run(clock)
         clock += 1
-        time.sleep(1)
+        # time.sleep(1)
     
     print(f"Mapa do disco: {sm.blocks}")
 
